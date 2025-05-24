@@ -1,7 +1,6 @@
-# filepath: /Users/omtailor/task-management-app/.gitignore
 node_modules/
 .env
-data/tasks.db # If you don't want to commit the dev database
+data/tasks.db 
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
