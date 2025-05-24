@@ -1,0 +1,932 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Task Management API",
+    "version": "1.0.0",
+    "description": "A simple API to manage tasks, built with Node.js, Express, and SQLite. Most task endpoints require authentication.",
+    "contact": {
+      "name": "API Support"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Development server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The user ID.",
+            "readOnly": true
+          },
+          "username": {
+            "type": "string",
+            "description": "The username."
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "The user's email address.",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the user was created.",
+            "readOnly": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the user was last updated.",
+            "readOnly": true
+          }
+        },
+        "example": {
+          "id": 1,
+          "username": "testuser",
+          "email": "test@example.com",
+          "createdAt": "2024-05-23T10:30:00.000Z",
+          "updatedAt": "2024-05-23T10:30:00.000Z"
+        }
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "urgent"
+          }
+        }
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The task ID.",
+            "readOnly": true,
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "The task title.",
+            "example": "Buy groceries"
+          },
+          "description": {
+            "type": "string",
+            "description": "The task description.",
+            "nullable": true,
+            "example": "Milk, Eggs, Bread"
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Whether the task is completed or not.",
+            "example": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the task was created.",
+            "readOnly": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The date and time the task was last updated.",
+            "readOnly": true
+          },
+          "userId": {
+            "type": "integer",
+            "description": "The ID of the user who owns the task.",
+            "example": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            },
+            "description": "Tags associated with the task.",
+            "example": [
+              {
+                "id": 1,
+                "name": "home"
+              },
+              {
+                "id": 2,
+                "name": "shopping"
+              }
+            ]
+          }
+        }
+      },
+      "TaskInput": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The task title.",
+            "example": "Schedule meeting"
+          },
+          "description": {
+            "type": "string",
+            "description": "The task description.",
+            "nullable": true,
+            "example": "Team meeting for project alpha"
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Whether the task is completed or not. Defaults to false.",
+            "example": false
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "example": "work"
+            },
+            "description": "An array of tag names to associate with the task.",
+            "example": [
+              "project-alpha",
+              "meeting"
+            ]
+          }
+        }
+      },
+      "TaskUpdateInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The new title of the task.",
+            "example": "Updated: Schedule meeting"
+          },
+          "description": {
+            "type": "string",
+            "description": "The new detailed description of the task.",
+            "nullable": true,
+            "example": "Updated: Team meeting with stakeholders"
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "The new completion status of the task.",
+            "example": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "example": "work"
+            },
+            "description": "An array of tag names. Replaces all existing tags for the task. If an empty array is provided, all tags will be removed.",
+            "example": [
+              "project-alpha",
+              "urgent"
+            ]
+          }
+        }
+      },
+      "TasksResponse": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Task"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "example": 10
+          },
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "limit": {
+            "type": "integer",
+            "example": 10
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 1
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Error message description"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "'title' is required"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "tags": [
+          "Authentication"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "example": "testuser"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "password123",
+                    "minLength": 6
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/UserProfile"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., missing fields, short password, invalid email)"
+          },
+          "409": {
+            "description": "Username or Email already exists"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Log in an existing user",
+        "tags": [
+          "Authentication"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "example": "testuser"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "password123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful, returns JWT token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/UserProfile"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing username or password"
+          },
+          "401": {
+            "description": "Invalid username or password"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/tags": {
+      "get": {
+        "summary": "Retrieve a list of all available tags",
+        "tags": [
+          "Tags"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of tags.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Tag"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/tasks": {
+      "get": {
+        "summary": "Retrieve a list of tasks with pagination, filtering, and sorting",
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number for pagination."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of tasks per page."
+          },
+          {
+            "in": "query",
+            "name": "completed",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "description": "Filter tasks by completion status."
+          },
+          {
+            "in": "query",
+            "name": "sortBy",
+            "schema": {
+              "type": "string",
+              "example": "createdAt_DESC"
+            },
+            "description": "Sort tasks by field and order (e.g., title_ASC, completed_DESC). Allowed fields - createdAt, updatedAt, title, completed."
+          },
+          {
+            "in": "query",
+            "name": "tags",
+            "schema": {
+              "type": "string",
+              "example": "work,urgent"
+            },
+            "description": "Filter tasks by a comma-separated list of tag names."
+          },
+          {
+            "in": "query",
+            "name": "tagMatchMode",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "any"
+              ],
+              "default": "all"
+            },
+            "description": "Determines how tasks are filtered by tags. 'all' means tasks must have all specified tags. 'any' means tasks must have at least one of the specified tags."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of tasks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TasksResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new task",
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The task was successfully created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error."
+          }
+        }
+      }
+    },
+    "/tasks/{id}": {
+      "get": {
+        "summary": "Get a task by its ID",
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the task to retrieve."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Details of the task.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error."
+          }
+        }
+      },
+      "put": {
+        "summary": "Update an existing task",
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the task to update."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskUpdateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The task was successfully updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data or ID format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a task by its ID",
+        "tags": [
+          "Tasks"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the task to delete."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The task was successfully deleted. No content."
+          },
+          "400": {
+            "description": "Invalid ID format.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error."
+          }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "summary": "Get current user's profile",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (token missing or invalid)"
+          },
+          "404": {
+            "description": "User profile not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update current user's profile",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "New email address for the user. Can be null to remove email.",
+                    "example": "new.email@example.com"
+                  }
+                },
+                "example": {
+                  "email": "new.email@example.com"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User profile updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., invalid email format, no data provided)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "Email already in use by another account"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/users/me/change-password": {
+      "post": {
+        "summary": "Change current user's password",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "oldPassword",
+                  "newPassword"
+                ],
+                "properties": {
+                  "oldPassword": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "The user's current password.",
+                    "example": "currentPassword123"
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "The new password for the user (min 6 characters).",
+                    "example": "newStrongPassword456",
+                    "minLength": 6
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Password changed successfully."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input (e.g., incorrect old password, new password too short, new password same as old)"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "User registration and login"
+    },
+    {
+      "name": "Tags",
+      "description": "API for managing tags"
+    },
+    {
+      "name": "Tasks",
+      "description": "API for managing tasks (Authentication Required)"
+    },
+    {
+      "name": "Users",
+      "description": "User profile management (Authentication Required)"
+    }
+  ]
+}
